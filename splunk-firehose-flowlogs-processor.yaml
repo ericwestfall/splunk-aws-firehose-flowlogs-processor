@@ -42,10 +42,6 @@ Resources:
                 - "lambda.amazonaws.com"
             Action:
               - "sts:AssumeRole"
-            Condition:
-              ArnLike:
-                aws:PrincipalArn:
-                  - !GetAtt SplunkFirehoseFlowlogsProcessor.Arn
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 
