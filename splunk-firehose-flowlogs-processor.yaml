@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  This template deploys the data transformation function to stream VPC Flow Logs 
+  to Splunk via Amazon Kinesis Firehose. 
+
+Parameters:
+  DeploymentBucketName:
+    Type: String
+    Description: >-
+      (Required) The name of the S3 Bucket where the Splunk deployment artifact is stored.
+
+  DeploymentArtifactKey:
+    Type: String
+    Description: >-
+      (Optional) The S3 key for the Splunk deployment artifact.
+    Default: "splunk-firehose-flowlogs-processor.zip"
+
+Resources:
+  SplunkFirehoseFlowlogsProcessor:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.8
+      Role:
+      Handler: app.lambda_handler
+      Code:
+        S3Bucket: DeploymentBucketName
+        S3Key: DeploymentArtifactKey
+      Description: Data transformation function to stream VPC Flow Logs to Splunk via Firehose.
+      Timeout: 90
+      MemorySize: 128
+
+  SplunkFirehoseFlowlogsProcessorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Execution role that can be assumed by the Splunk Flow Logs Processor function.
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+            Condition:
+              ArnLike:
+                aws:PrincipalArn:
+                  - !GetAtt SplunkFirehoseFlowlogsProcessor.Arn
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+Outputs:
+  SplunkFirehoseFlowlogsProcessor:
+    Description: Splunk Firehose VPC FlowLogs function ARN
+    Value: !GetAtt SplunkFirehoseFlowlogsProcessor.Arn
+
+  SplunkFirehoseFlowlogsProcessorRole:
+    Description: Implicit IAM Role created for Splunk Firehose VPC FlowLogs function
+    Value: !GetAtt SplunkFirehoseFlowlogsProcessor.Arn
