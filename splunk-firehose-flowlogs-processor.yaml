@@ -1,38 +1,88 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
-  This template deploys the data transformation function to stream VPC Flow Logs 
-  to Splunk via Amazon Kinesis Firehose. 
+  This template deploys the Splunk Flow Logs Processor, providing data transformation 
+  capabilities to stream VPC Flow Logs to Splunk via Amazon Kinesis Firehose. 
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: >-
+            Deployment Artifact Configuration for Splunk Flow Logs Processor
+        Parameters:
+          - DeploymentBucketName
+          - DeploymentArtifactKey
+
+      - Label:
+          default: >-
+            Optional Configuration Parameters for Splunk Flow Logs Processor
+        Parameters:
+          - FunctionMemorySize
+          - FunctionTimeout
+
 
 Parameters:
   DeploymentBucketName:
     Type: String
     Description: >-
-      (Required) The name of the S3 Bucket where the Splunk deployment artifact is stored.
+      (Required) The name of the S3 Bucket where the Splunk Flow Logs Processor 
+      deployment artifact is stored.
+    AllowedPattern: ^[0-9A-Za-z\.\-_]*(?<!\.)$
+    MinLength: 3
+    MaxLength: 63
 
   DeploymentArtifactKey:
     Type: String
     Description: >-
-      (Optional) The S3 key for the Splunk deployment artifact.
+      (Optional) The S3 key of the Splunk Flow Logs Processor deployment artifact.
     Default: "splunk-firehose-flowlogs-processor.zip"
+    MinLength: 1
+    MaxLength: 1024
+
+  FunctionMemorySize:
+    Type: Number
+    Description: >-
+      (Optional) The amount of memory available to the Splunk Flow Logs Processor 
+      function at runtime.
+    Default: 128
+    MinValue: 128
+    MaxValue: 10240
+
+  FunctionTimeout:
+    Type: Number
+    Description: >-
+      (Optional) The amount of time in seconds the Splunk Flow Logs Processor
+      function is permitted to run before it is stopped.
+    Default: 90
+    MinValue: 1
+    MaxValue: 900
+
 
 Resources:
-  SplunkFirehoseFlowlogsProcessor:
+  SplunkFirehoseFlowLogsProcessor:
     Type: AWS::Lambda::Function
     Properties:
+      Description: >- 
+        Data transformation function to stream VPC Flow Logs to Splunk via 
+        Amazon Kinesis Firehose.
+      Architectures:
+        - x86_64
       Runtime: python3.8
-      Role: !GetAtt SplunkFirehoseFlowlogsProcessorRole.Arn
       Handler: app.lambda_handler
+      Role: !GetAtt SplunkFirehoseFlowLogsProcessorRole.Arn
+      PackageType: Zip
       Code:
-        S3Bucket: DeploymentBucketName
-        S3Key: DeploymentArtifactKey
-      Description: Data transformation function to stream VPC Flow Logs to Splunk via Firehose.
-      Timeout: 90
-      MemorySize: 128
+        S3Bucket: !Ref DeploymentBucketName
+        S3Key: !Ref DeploymentArtifactKey
+      Timeout: !Ref FunctionTimeout
+      MemorySize: !Ref FunctionMemorySize
 
-  SplunkFirehoseFlowlogsProcessorRole:
+  SplunkFirehoseFlowLogsProcessorRole:
     Type: AWS::IAM::Role
     Properties:
-      Description: Execution role that can be assumed by the Splunk Flow Logs Processor function.
+      Description: >-
+        Execution role that can be assumed by the Splunk Flow Logs Processor 
+        Lambda function.
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -42,14 +92,21 @@ Resources:
                 - "lambda.amazonaws.com"
             Action:
               - "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                aws:SourceAccount:
+                  - !Sub '${AWS::AccountId}'
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 
-Outputs:
-  SplunkFirehoseFlowlogsProcessor:
-    Description: Splunk Firehose VPC FlowLogs function ARN
-    Value: !GetAtt SplunkFirehoseFlowlogsProcessor.Arn
 
-  SplunkFirehoseFlowlogsProcessorRole:
-    Description: Implicit IAM Role created for Splunk Firehose VPC FlowLogs function
-    Value: !GetAtt SplunkFirehoseFlowlogsProcessor.Arn
+Outputs:
+  SplunkFirehoseFlowLogsProcessor:
+    Description: >-
+      The Amazon Resource Name (ARN) of the Splunk Flow Logs Processor function.
+    Value: !GetAtt SplunkFirehoseFlowLogsProcessor.Arn
+
+  SplunkFirehoseFlowLogsProcessorRole:
+    Description: >-
+      The Amazon Resource Name (ARN) of the Splunk Flow Logs Processor IAM Role.
+    Value: !GetAtt SplunkFirehoseFlowLogsProcessor.Arn
